@@ -9,7 +9,7 @@
 //const char* ssid = "имя точки доступа";
 //const char* password = "пароль точки доступа";
 
-const char* server = "www.tremaru-file.github.io/OTA_update/";
+const char* server = "https://tremaru-file.github.io/OTA_update/";
 
 #define FW_LED LED_BUILTIN
 //#define FW_LED 18
@@ -129,6 +129,7 @@ void initDisplay()
 	disp.noBlink();
 	disp.print("CTAPTyEM....");
 	delay(500);
+	disp.clear();
 }
 
 // инициализация кнопок
@@ -152,8 +153,8 @@ void released(Button2& btn)
 {
 	switch (btn.getPin()) {
 		default: break;
-		case BUTTON_LEFT: ++menu_state; break;
-		case BUTTON_RIGHT: update(); break;
+		case BUTTON_RIGHT: ++menu_state; disp.clear(); break;
+		case BUTTON_LEFT: update(); break;
 	}
 }
 
@@ -162,11 +163,16 @@ void update()
 	HTTPClient client;
 	client.begin((String)server + filename_strings[menu_state]);
 
-	if (client.GET() == HTTP_CODE_OK) {
+	int httpcode = client.GET();
+	if (httpcode == HTTP_CODE_OK) {
+		disp.clear();
+		disp.print("FW UPDATE..");
 		updateFirmware(client);
 	}
 	else {
-	// error	
+		disp.clear();
+		disp.printf("HTTP: %d", httpcode);
+		Serial.printf("HTTP: %d", httpcode);
 	}
 	client.end();
 	ESP.restart();
@@ -199,6 +205,12 @@ void updateFlash(uint8_t* data, size_t len)
 {
 	Update.write(data, len);
 	g_curr_length += len;
+
+	static int count = 0;
+	count++;
+	if (count % 1024 == 0)
+		disp.print(".");
+
 	if (g_curr_length != g_full_length)
 		return;
 
