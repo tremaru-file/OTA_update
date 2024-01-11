@@ -1,4 +1,6 @@
 #include <WiFi.h>
+#include <HTTPClient.h>
+#include <Update.h>
 #include <LiquidCrystal_I2C.h> // 1.1.4
 #include <Button2.h> // 2.2.4
 #include "password.h"
@@ -6,6 +8,8 @@
 // данные для подключения
 //const char* ssid = "имя точки доступа";
 //const char* password = "пароль точки доступа";
+
+const char* server = "www.tremaru-file.github.io/OTA_update/";
 
 #define FW_LED LED_BUILTIN
 //#define FW_LED 18
@@ -53,7 +57,7 @@ const char* filename_strings[] {
 #define X(INDEX, STR, FILENAME) FILENAME,
 	MENU
 #undef X
-}
+};
 
 LiquidCrystal_I2C disp(0x27, 20, 4);
 
@@ -79,6 +83,10 @@ void loop()
 
 void handleDisplay()
 {
+	disp.setCursor(0,0);
+	disp.print(disp_strings[menu_state]);
+	disp.setCursor(0,1);
+	disp.print(filename_strings[menu_state]);
 }
 
 void handleMenu()
@@ -151,26 +159,11 @@ void released(Button2& btn)
 
 void update()
 {
-	HTTPClinet client;
-	client.begin(server + filename_strings[menu_state]);
+	HTTPClient client;
+	client.begin((String)server + filename_strings[menu_state]);
 
 	if (client.GET() == HTTP_CODE_OK) {
-		g_full_length = client.getSize();
-		int len = g_full_length;
-		Update.begin(UPDATE_SIZE_UNKNOWN);
-		uint8_t buff[128]{};
-		WiFiClient* stream = client.getStreamPtr();
-
-		while (client.connected() && (len > 0 || len == -1)) {
-			size_t stream->available();
-			if (size) {
-				int bytes_read = stream->readBytes(buff, ((size > sizeof(buff))?sizeof(buff):size));
-				updateFirmware(buff, bytes_read);
-				if (len > 0)
-					len -= bytes_read;
-			}
-			delay(1);
-		}
+		updateFirmware(client);
 	}
 	else {
 	// error	
@@ -179,7 +172,30 @@ void update()
 	ESP.restart();
 }
 
-void updateFirmware(uint8_t* data, size_t len)
+int g_full_length = 0;
+int g_curr_length = 0;
+
+void updateFirmware(HTTPClient& client) {
+	uint8_t buff[128]{};
+	g_full_length = client.getSize();
+	int len = g_full_length;
+	Update.begin(UPDATE_SIZE_UNKNOWN);
+	WiFiClient* stream = client.getStreamPtr();
+
+	while (client.connected() && (len > 0 || len == -1)) {
+		size_t size = stream->available();
+		if (size) {
+			int bytes_read = stream->readBytes(buff, ((size > sizeof(buff))?sizeof(buff):size));
+			updateFlash(buff, bytes_read);
+			if (len > 0)
+				len -= bytes_read;
+		}
+		delay(1);
+	}
+}
+
+
+void updateFlash(uint8_t* data, size_t len)
 {
 	Update.write(data, len);
 	g_curr_length += len;
