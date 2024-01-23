@@ -6,8 +6,8 @@
 #include <Button2.h> // 2.2.4
 
 // данные для подключения
-const char* ssid = "Имя Вашей точки доступа WiFi";
-const char* password = "Пароль Вашей точки доступа WiFi";
+String ssid = "";
+String password = "";
 
 // адрес сервера 
 // const char* server = "адрес сервера для хранения файлов (слеш в конце строки обязателен)/";
@@ -80,10 +80,16 @@ Button2 rightButton;
 
 void setup()
 {
+	Serial.begin(115200);
+	initDisplay();
+	if (!SPIFFS.begin()) {
+		disp.print("E 02");
+		while(1);
+	}
+	loadWiFiCred();
 	initWiFi();
 	initFlashMemory();
-	saveWiFiCred();
-	initDisplay();
+	//saveWiFiCred();
 	initButtons();
 	initLED();
 }
@@ -207,6 +213,61 @@ bool saveWiFiCred()
 	catch (...) {
 		Serial.println("Исключение при сохранении файла");
 		return false;
+	}
+}
+
+void parseFile(fs::File&);
+
+// обработка загрузки файла
+void loadWiFiCred() try
+{
+	if (!SPIFFS.exists(settings_file)) {
+		Serial.println("Нет файла настроек");
+		return;
+	}
+
+	g_file = SPIFFS.open(settings_file, "r");
+
+	if (!g_file) {
+		Serial.println("Не получилось открыть файл");
+		return;
+	}
+
+	parseFile(g_file);
+
+	g_file.close();
+}
+catch (...)
+{
+	g_file.close();
+	Serial.println("Проблемы парсинга файла");
+}
+
+// парсинг файла настроек WiFi
+void parseFile(fs::File& file)
+{
+	static constexpr size_t bufsiz = 256;
+	int b = 0;
+	char buf[bufsiz];
+	String loaded_setting = "";
+
+	while (b != EOF) {
+		static int i = 0;
+		static bool on_password = false;
+		b = file.read();
+		if (b == '\n') {
+			loaded_setting = String(buf);
+			if (on_password)
+				password = loaded_setting;
+			else
+				ssid = loaded_setting;
+
+			Serial.println(loaded_setting);
+			i = 0;
+			memset(buf, '\0', bufsiz);
+			continue;
+		}
+		buf[i++] = (byte)b;
 	}
 }
 
