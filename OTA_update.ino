@@ -129,7 +129,7 @@ void handleLED()
 
 void initWiFi()
 {
-	WiFi.begin(ssid, password);
+	WiFi.begin(ssid.c_str(), password.c_str());
 
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(500);
@@ -250,6 +250,7 @@ void parseFile(fs::File& file)
 	int b = 0;
 	char buf[bufsiz];
 	String loaded_setting = "";
+	memset(buf, '\0', bufsiz);
 
 	while (b != EOF) {
 		static int i = 0;
@@ -259,8 +260,10 @@ void parseFile(fs::File& file)
 			loaded_setting = String(buf);
 			if (on_password)
 				password = loaded_setting;
-			else
+			else {
 				ssid = loaded_setting;
+				on_password = true;
+			}
 
 			Serial.println(loaded_setting);
 			i = 0;
