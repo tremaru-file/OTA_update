@@ -1,17 +1,18 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Update.h>
+#include <SPIFFS.h>
 #include <LiquidCrystal_I2C.h> // 1.1.4
 #include <Button2.h> // 2.2.4
 
 // данные для подключения
-const char* ssid = "имя точки доступа";
-const char* password = "пароль точки доступа";
+const char* ssid = "Имя Вашей точки доступа WiFi";
+const char* password = "Пароль Вашей точки доступа WiFi";
 
 // адрес сервера 
-const char* server = "адрес сервера для хранения файлов (слеш в конце строки обязателен)/";
+// const char* server = "адрес сервера для хранения файлов (слеш в конце строки обязателен)/";
 // для проверки можно использовать наш репозиторий с уже загруженными прошивками:
-//const char* server = "https://tremaru-file.github.io/OTA_update/";
+const char* server = "https://tremaru-file.github.io/OTA_update/";
 
 // выводы светодиодов (разкомментировать только один для каждой версии прошивки)
 #define FW_LED LED_BUILTIN // BLUE
@@ -64,6 +65,13 @@ const char* filename_strings[] {
 #undef X
 };
 
+// название файла настроек
+const char* settings_file = "/wifi.cfg";
+
+// объект файла настроек
+fs::File g_file;
+
+// объект дисплея
 LiquidCrystal_I2C disp(0x27, 20, 4);
 
 // объекты кнопок
@@ -73,6 +81,8 @@ Button2 rightButton;
 void setup()
 {
 	initWiFi();
+	initFlashMemory();
+	saveWiFiCred();
 	initDisplay();
 	initButtons();
 	initLED();
@@ -152,6 +162,52 @@ void handleInput()
 {
 	leftButton.loop();
 	rightButton.loop();
+}
+
+// инициализация памяти
+void initFlashMemory()
+{
+	if (!SPIFFS.begin()) {
+		Serial.println("Форматируем память, нужно подождать...");
+		disp.print("F   ");
+		SPIFFS.format();
+	}
+
+	if (!SPIFFS.begin()) {
+		Serial.println("Не получилось отформатировать, остановка.");
+		disp.print("E 01");
+		while(true)
+			;
+	}
+}
+
+// сохранение настроек WiFi (необходимо, если используется наш репозиторий)
+bool saveWiFiCred()
+{
+	try {
+		g_file = SPIFFS.open(settings_file, "w");
+
+		if (!g_file) {
+			Serial.println("Ошибка открытия файла");
+			return false;
+		}
+
+		g_file.print(ssid);
+		g_file.print('\n');
+		g_file.print(password);
+		g_file.print('\n');
+
+		g_file.flush();
+		g_file.close();
+
+		Serial.println("Настройки сохранены");
+
+		return true;
+	}
+	catch (...) {
+		Serial.println("Исключение при сохранении файла");
+		return false;
+	}
 }
 
 void released(Button2& btn)
