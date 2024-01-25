@@ -242,6 +242,8 @@ void update()
 
 	client.end();
 
+	pinMode(FW_LED, INPUT);
+
 	// перезагрузка
 	ESP.restart();
 }
